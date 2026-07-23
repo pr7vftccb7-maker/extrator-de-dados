@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extrator de Dados</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 15px;
+            background-color: #f2f2f7;
+            color: #1c1c1e;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h2 {
+            margin-top: 10px;
+            font-size: 20px;
+            color: #000;
+        }
+        .instrucoes {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        textarea {
+            width: 100%;
+            height: 160px;
+            padding: 12px;
+            border: 1px solid #d1d1d6;
+            border-radius: 10px;
+            font-size: 14px;
+            background-color: #fff;
+            resize: vertical;
+            outline: none;
+        }
+        textarea:focus {
+            border-color: #007aff;
+        }
+        .btn-processar {
+            width: 100%;
+            margin-top: 10px;
+            padding: 14px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-processar:active {
+            background-color: #0056b3;
+        }
+        .status-scroll {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+        .tabela-container {
+            overflow-x: auto;
+            margin-top: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e5e5ea;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #f8f8f8;
+            color: #8e8e93;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+        .btn-copiar {
+            background-color: #e5e5ea;
+            color: #007aff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 6px;
+            transition: all 0.2s;
+        }
+        .btn-copiar.copiado {
+            background-color: #34c759;
+            color: white;
+        }
+        .badge-id {
+            background: #e5e5ea;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #3a3a3c;
+        }
+    </style>
+</head>
+<body>
+
+<div class="status-scroll" id="statusScroll">Posição salva</div>
+
+<div class="container">
+    <h2>Importar Dados Cadastrais</h2>
+    <p class="instrucoes">Cole o texto bruto contendo os blocos <code>RESULTADO (...)</code> abaixo e clique no botão:</p>
+    
+    <textarea id="entradaDados" placeholder="Cole aqui seus resultados, por exemplo:&#10;&#10;RESULTADO (374):&#10;「👤」 𝗗𝗔𝗗𝗢𝗦 𝗖𝗔𝗗𝗔𝗦𝗧𝗥𝗔𝗜𝗦&#10;- NOME: LUCAS DE OLIVEIRA&#10;- CPF: 12538707994&#10;- NASC: 28/07/1998&#10;- SEXO: M&#10;- CNS: 702009351577989"></textarea>
+    
+    <button class="btn-processar" onclick="processarTexto()">Importar e Gerar Tabela</button>
+
+    <div class="tabela-container" id="containerTabela" style="display: none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nº</th>
+                    <th>Nome</th>
+                    <th>CPF</th>
+                    <th>Nasc.</th>
+                    <th>Sexo</th>
+                    <th>CNS</th>
+                </tr>
+            </thead>
+            <tbody id="corpoTabela">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const CHAVE_SCROLL = 'posicao_scroll_pagina';
+    const CHAVE_DADOS = 'dados_cadastrais_salvos';
+
+    // 1. MANTER ROLAGEM E DADOS MESMO AO SAIR/VOLTAR NO iOS
+    window.addEventListener('DOMContentLoaded', () => {
+        const dadosSalvos = localStorage.getItem(CHAVE_DADOS);
+        if (dadosSalvos) {
+            document.getElementById('entradaDados').value = dadosSalvos;
+            processarTexto(false);
+        }
+
+        const posicaoSalva = localStorage.getItem(CHAVE_SCROLL);
+        if (posicaoSalva !== null) {
+            setTimeout(() => {
+                window.scrollTo(0, parseInt(posicaoSalva, 10));
+                mostrarStatus('Posição restaurada!');
+            }, 100);
+        } else {
+            ocultarStatus();
+        }
+    });
+
+    window.addEventListener('scroll', () => {
+        localStorage.setItem(CHAVE_SCROLL, window.scrollY);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            localStorage.setItem(CHAVE_SCROLL, window.scrollY);
+        }
+    });
+
+    function mostrarStatus(mensagem) {
+        const el = document.getElementById('statusScroll');
+        el.innerText = mensagem;
+        el.style.display = 'block';
+        setTimeout(ocultarStatus, 2500);
+    }
+
+    function ocultarStatus() {
+        document.getElementById('statusScroll').style.display = 'none';
+    }
+
+    // 2. PARSER / IMPORTADOR DE DADOS
+    function processarTexto(salvarTexto = true) {
+        const texto = document.getElementById('entradaDados').value;
+        
+        if (salvarTexto) {
+            localStorage.setItem(CHAVE_DADOS, texto);
+        }
+
+        if (!texto.trim()) {
+            document.getElementById('containerTabela').style.display = 'none';
+            return;
+        }
+
+        const regexBloco = /RESULTADO\s*\((.*?)\):/gi;
+        const blocosBrutos = texto.split(regexBloco);
+        
+        const listaResultados = [];
+
+        for (let i = 1; i < blocosBrutos.length; i += 2) {
+            const numResultado = blocosBrutos[i].trim();
+            const conteudoBloco = blocosBrutos[i + 1] || '';
+
+            const nomeMatch = conteudoBloco.match(/-\s*NOME:\s*(.*)/i);
+            const cpfMatch = conteudoBloco.match(/-\s*CPF:\s*(.*)/i);
+            const nascMatch = conteudoBloco.match(/-\s*NASC:\s*(.*)/i);
+            const sexoMatch = conteudoBloco.match(/-\s*SEXO:\s*(.*)/i);
+            const cnsMatch = conteudoBloco.match(/-\s*CNS:\s*(.*)/i);
+
+            listaResultados.push({
+                num: numResultado,
+                nome: nomeMatch ? nomeMatch[1].trim() : '-',
+                cpf: cpfMatch ? cpfMatch[1].trim() : '-',
+                nasc: nascMatch ? nascMatch[1].trim() : '-',
+                sexo: sexoMatch ? sexoMatch[1].trim() : '-',
+                cns: cnsMatch ? cnsMatch[1].trim() : '-'
+            });
+        }
+
+        renderizarTabela(listaResultados);
+    }
+
+    function renderizarTabela(dados) {
+        const corpoTabela = document.getElementById('corpoTabela');
+        corpoTabela.innerHTML = '';
+
+        if (dados.length === 0) {
+            document.getElementById('containerTabela').style.display = 'none';
+            return;
+        }
+
+        dados.forEach(item => {
+            const tr = document.createElement('tr');
+
+            tr.innerHTML = `
+                <td><span class="badge-id">${item.num}</span></td>
+                <td>
+                    ${item.nome}
+                    ${item.nome !== '-' ? `<button class="btn-copiar" onclick="copiarTexto(this, '${escaparAspas(item.nome)}')">Copiar</button>` : ''}
+                </td>
+                <td>
+                    ${item.cpf}
+                    ${item.cpf !== '-' ? `<button class="btn-copiar" onclick="copiarTexto(this, '${escaparAspas(item.cpf)}')">Copiar</button>` : ''}
+                </td>
+                <td>
+                    ${item.nasc}
+                    ${item.nasc !== '-' ? `<button class="btn-copiar" onclick="copiarTexto(this, '${escaparAspas(item.nasc)}')">Copiar</button>` : ''}
+                </td>
+                <td>${item.sexo}</td>
+                <td>${item.cns}</td>
+            `;
+
+            corpoTabela.appendChild(tr);
+        });
+
+        document.getElementById('containerTabela').style.display = 'block';
+    }
+
+    // 3. COPIAR COM FEEDBACK VISUAL
+    function copiarTexto(botao, texto) {
+        navigator.clipboard.writeText(texto).then(() => {
+            const textoOriginal = botao.innerText;
+            botao.innerText = 'Copiado!';
+            botao.classList.add('copiado');
+            
+            setTimeout(() => {
+                botao.innerText = textoOriginal;
+                botao.classList.remove('copiado');
+            }, 1500);
+        }).catch(err => {
+            console.error('Erro ao copiar: ', err);
+        });
+    }
+
+    function escaparAspas(str) {
+        return str.replace(/'/g, "\'").replace(/"/g, '&quot;');
+    }
+</script>
+
+</body>
+</html>
