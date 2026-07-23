@@ -96,6 +96,8 @@
             text-transform: uppercase;
             font-size: 12px;
         }
+        
+        /* Estilo Padrão do Botão */
         .btn-copiar {
             background-color: #e5e5ea;
             color: #007aff;
@@ -108,10 +110,14 @@
             margin-left: 6px;
             transition: all 0.2s;
         }
-        .btn-copiar.copiado {
-            background-color: #34c759;
-            color: white;
+
+        /* Estilo do Botão quando for USADO / COPIADO (Fica Vermelho Permanentemente) */
+        .btn-copiar.usado {
+            background-color: #ff3b30 !important;
+            color: white !important;
+            font-weight: bold;
         }
+
         .badge-id {
             background: #e5e5ea;
             padding: 3px 8px;
@@ -155,8 +161,12 @@
 <script>
     const CHAVE_SCROLL = 'posicao_scroll_pagina';
     const CHAVE_DADOS = 'dados_cadastrais_salvos';
+    const CHAVE_USADOS = 'botoes_usados_salvos';
 
-    // 1. MANTER ROLAGEM E DADOS MESMO AO SAIR/VOLTAR NO iOS
+    // Lista para manter o controle de quais botões já foram clicados
+    let botoesUsados = JSON.parse(localStorage.getItem(CHAVE_USADOS) || '[]');
+
+    // 1. MANTER ROLAGEM, DADOS E BOTÕES USADOS MESMO AO SAIR/VOLTAR
     window.addEventListener('DOMContentLoaded', () => {
         const dadosSalvos = localStorage.getItem(CHAVE_DADOS);
         if (dadosSalvos) {
@@ -202,6 +212,9 @@
         
         if (salvarTexto) {
             localStorage.setItem(CHAVE_DADOS, texto);
+            // Se importou um texto novo manualmente, limpa os botões vermelhos antigos
+            botoesUsados = [];
+            localStorage.removeItem(CHAVE_USADOS);
         }
 
         if (!texto.trim()) {
@@ -249,19 +262,24 @@
         dados.forEach(item => {
             const tr = document.createElement('tr');
 
+            // Identificadores únicos para o sistema saber qual botão já foi clicado
+            const idNome = `${item.num}_nome`;
+            const idCpf = `${item.num}_cpf`;
+            const idNasc = `${item.num}_nasc`;
+
             tr.innerHTML = `
                 <td><span class="badge-id">${item.num}</span></td>
                 <td>
                     ${item.nome}
-                    ${item.nome !== '-' ? `<button class="btn-copiar" onclick="copiarTexto(this, '${escaparAspas(item.nome)}')">Copiar</button>` : ''}
+                    ${item.nome !== '-' ? criatBotaoCopiar(idNome, item.nome) : ''}
                 </td>
                 <td>
                     ${item.cpf}
-                    ${item.cpf !== '-' ? `<button class="btn-copiar" onclick="copiarTexto(this, '${escaparAspas(item.cpf)}')">Copiar</button>` : ''}
+                    ${item.cpf !== '-' ? criatBotaoCopiar(idCpf, item.cpf) : ''}
                 </td>
                 <td>
                     ${item.nasc}
-                    ${item.nasc !== '-' ? `<button class="btn-copiar" onclick="copiarTexto(this, '${escaparAspas(item.nasc)}')">Copiar</button>` : ''}
+                    ${item.nasc !== '-' ? criatBotaoCopiar(idNasc, item.nasc) : ''}
                 </td>
                 <td>${item.sexo}</td>
                 <td>${item.cns}</td>
@@ -273,24 +291,35 @@
         document.getElementById('containerTabela').style.display = 'block';
     }
 
-    // 3. COPIAR COM FEEDBACK VISUAL
+    function criatBotaoCopiar(idUnico, valorTexto) {
+        const jaFoiUsado = botoesUsados.includes(idUnico);
+        const classeStatus = jaFoiUsado ? 'btn-copiar usado' : 'btn-copiar';
+        const textoBotao = jaFoiUsado ? 'Usado!' : 'Copiar';
+
+        return `<button class="${classeStatus}" data-id="${idUnico}" onclick="copiarTexto(this, '${escaparAspas(valorTexto)}')">${textoBotao}</button>`;
+    }
+
+    // 3. COPIAR E MUDAR PARA VERMELHO PERMANENTE
     function copiarTexto(botao, texto) {
         navigator.clipboard.writeText(texto).then(() => {
-            const textoOriginal = botao.innerText;
-            botao.innerText = 'Copiado!';
-            botao.classList.add('copiado');
-            
-            setTimeout(() => {
-                botao.innerText = textoOriginal;
-                botao.classList.remove('copiado');
-            }, 1500);
+            const id = botao.getAttribute('data-id');
+
+            // Altera visualmente para vermelho
+            botao.innerText = 'Usado!';
+            botao.classList.add('usado');
+
+            // Salva na memória do celular para não perder a cor nem ao fechar a página
+            if (id && !botoesUsados.includes(id)) {
+                botoesUsados.push(id);
+                localStorage.setItem(CHAVE_USADOS, JSON.stringify(botoesUsados));
+            }
         }).catch(err => {
             console.error('Erro ao copiar: ', err);
         });
     }
 
     function escaparAspas(str) {
-        return str.replace(/'/g, "\'").replace(/"/g, '&quot;');
+        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
     }
 </script>
 
